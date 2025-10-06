@@ -43,13 +43,17 @@ while True:
             print(f'{id:<5}{apellido:<20}{nombre:<20}')
 
 
-        id_cliente_buscar = input('\nDigite su ID: ')
-        id_cliente_buscar = int(id_cliente_buscar)
-        if id_cliente_buscar not in clientes.keys():
-          print('Error. ID no registrado')
+        id_cliente_buscar = input('\nDigite su ID: ').strip()
+        if not id_cliente_buscar.isdigit():
+          print('Error. Id invalido')
           continue
         else:
-          print('ID encontrado')
+          id_cliente_buscar = int(id_cliente_buscar)
+          if id_cliente_buscar not in clientes.keys():
+            print('Error. ID no registrado')
+            continue
+          else:
+            print('ID encontrado')
 
 
         hoy = datetime.now().date()  

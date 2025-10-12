@@ -336,7 +336,7 @@ while True:
                         max_length = max(max_length, len(str(cell.value)))
                 ws.column_dimensions[column].width = max_length + 2
 
-    # Guardar archivo
+    # Guardar archivo 
             nombre_archivo = "reporte_reservas.xlsx"
             wb.save(nombre_archivo)
             print(f"Reporte exportado como '{nombre_archivo}'")

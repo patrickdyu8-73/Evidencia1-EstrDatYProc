@@ -1,13 +1,53 @@
-
 from datetime import datetime, timedelta
-salas = {}
-id_sala = 1000
+import sqlite3
+from sqlite3 import Error
+import sys
 
-clientes = {}
-id_cliente = 0
 
-reservas = {}
-folio_contador = 0
+try:
+    with sqlite3.connect('espacios_coworking.db', detect_types = sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES) as conn:
+        cursor = conn.cursor()
+
+        cursor.execute('CREATE TABLE IF NOT EXISTS clientes \
+                        (id_cliente INTEGER PRIMARY KEY, \
+                        nombre TEXT NOT NULL, \
+                        apellido TEXT NOT NULL);')
+        
+
+        cursor.execute('CREATE TABLE IF NOT EXISTS salas \
+                        (id_sala INTEGER PRIMARY KEY, \
+                        nombre_sala TEXT NOT NULL, \
+                        cupo_sala INTEGER NOT NULL);')
+        
+
+        cursor.execute('CREATE TABLE IF NOT EXISTS reservaciones \
+                        (folio_reservacion INTEGER PRIMARY KEY, \
+                        nombre_reservacion TEXT NOT NULL, \
+                        turno_reservacion TEXT NOT NULL, \
+                        fecha_reservacion TIMESTAMP NOT NULL, \
+                        id_cliente INTEGER, \
+                        id_sala INTEGER, \
+                        FOREIGN KEY (id_cliente) REFERENCES clientes(id_cliente), \
+                        FOREIGN KEY (id_sala) REFERENCES salas(id_sala));')
+        
+except Error as e:
+    print(e)
+except:
+    print(f'Se produjo un error: {sys.exc_info()[0]}')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 while True:
@@ -28,386 +68,526 @@ while True:
   
 
   if opcion == '1':
-    if clientes:
-      while True:
-
-        clientes_ordenados = sorted(
-        clientes.items(),
-        key=lambda item: item[1][1].lower()
-        )
-
-        print("\n********** Clientes Registrados **********")
-        print(f'{'ID':<5}{'Apellido':<20}{'Nombre':<20}')
-        for id, datos in clientes_ordenados:
-            nombre, apellido = datos
-            print(f'{id:<5}{apellido:<20}{nombre:<20}')
-
-
-        id_cliente_buscar = input('\nDigite su ID ("X" para salir): ').strip().upper()
-        if id_cliente_buscar ==  'X':
-          print('Saliendo...')
-          break
-        if not id_cliente_buscar.isdigit():
-          print('Error. Id invalido')
-          continue
-        else:
-          id_cliente_buscar = int(id_cliente_buscar)
-          if id_cliente_buscar not in clientes.keys():
-            print('Error. ID no registrado')
-            continue
-          else:
-            print('ID encontrado')
-
-
-        hoy = datetime.now().date()  
-        fecha_minima = hoy + timedelta(days=2)
+    try:
+        with sqlite3.connect('espacios_coworking.db', detect_types = sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES) as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT id_cliente FROM clientes')
+            cliente_registrados = cursor.fetchall()
+    except Error as e:
+        print(e)
+    except:
+        print(f'Se produjo un error: {sys.exc_info()[0]}')
+    
+    if cliente_registrados:
         while True:
-          fecha_usuario_str=input("\nINGRESE LA FECHA DE RESERVA (DD-MM-AAAA): ").strip()
-          try:
-              fecha_usuario = datetime.strptime(fecha_usuario_str, "%d-%m-%Y").date()
+            try:
+                with sqlite3.connect('espacios_coworking.db', detect_types = sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute('SELECT id_cliente, apellido, nombre FROM clientes\
+                                    ORDER BY apellido')
+                    clientes_ordenados = cursor.fetchall()
 
-              if fecha_usuario >= fecha_minima:
-                print("La fecha es valida para reserva")
+                    if clientes_ordenados:
+                        print('\n********** CLIENTES REGISTRADOS **********')
+                        print(f'{'ID':<10} {'APELLIDO':<20} {'NOMBRE'}')
+                        print('='*42)
+                        for id_cliente,apellido_cliente,nombre_cliente in clientes_ordenados:
+                            print(f'{id_cliente:<10} {apellido_cliente:<20} {nombre_cliente}')
+                    else:
+                        print('No hay clientes registrados')
+            except Error as e:
+                print(e)
+            except:
+                print(f'Se produjo un error: {sys.exc_info()[0]}')
+
+
+            id_cliente_buscar = input('\nDigite su ID ("X" para salir): ').strip().upper()
+            if id_cliente_buscar ==  'X':
+                print('Saliendo...')
                 break
-              else:
-                print(f'Error. La fecha debe de ser por lo menos 2 dias posteriores a hoy {hoy}')
+            if not id_cliente_buscar.isdigit():
+                print('Error. Id invalido')
                 continue
-          except ValueError:
-            print("Formato de fecha invalido")
-            continue
-        
-
-        turnos = {'M':'Matutino', 'V': 'Vespertino', 'N': 'Nocturno'}
-        while True:
-          print('TURNOS: "Matutino"(M) | "Vespertino"(V) | "Nocturno"(N)')
-          seleccionar_turno = input("Ingrese turno el turno que desea (M/V/N): ").upper().strip()
-          if seleccionar_turno not in turnos.keys():
-            print('Error. Seleccione un turno valido')
-            continue
-          else:
-            turno_sala = turnos[seleccionar_turno]
-            print('Turno registrado')
-            break
-        
-        print("\n********** SALAS DISPONIBLES **********")
-        print(f'{'ID':<5}{'Nombre':<15}{'Cupo':<15}')
-        salas_disponibles = []
-        for id_sala_item, (nombre_sala, cupo_sala) in salas.items():
-          ocupada = False
-          for folio, datos_reserva in reservas.items():
-            if (datos_reserva['sala_id'] == id_sala_item and
-                datos_reserva['fecha'] == fecha_usuario and
-                datos_reserva['turno'] == turno_sala):
-              ocupada = True
-              break
-          if not ocupada:
-            print(f"{id_sala_item:<5}{nombre_sala:<15}{cupo_sala:<15}")
-            salas_disponibles.append(id_sala_item)
-
-        if not salas_disponibles:
-          print("No hay salas disponibles en esa fecha y turno.")
-          break
-
-        while True:
-          try:
-            sala_seleccionada = int(input("\nIngrese el ID de la sala: "))
-
-            if sala_seleccionada not in salas_disponibles:
-              print("La sala seleccionada no está disponible.")
-              continue
             else:
-              break
-          except ValueError:
-            print("Error. Debe ingresar un número de sala válido.")
-            continue
+                id_cliente_buscar = int(id_cliente_buscar)
+                try:
+                    with sqlite3.connect('espacios_coworking.db', detect_types = sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES) as conn:
+                        cursor = conn.cursor()
+                        buscar_cliente = {'clave':id_cliente_buscar}
+                        cursor.execute('SELECT id_cliente FROM clientes WHERE id_cliente = :clave',buscar_cliente)
+                        cliente_buscado = cursor.fetchall()
+                        if cliente_buscado:
+                            print('ID encontrado')
+                        else:
+                            print('ID no encontrado')
+                            continue
+                except Error as e:
+                    print(e)
+                except:
+                    print(f'Se produjo un error: {sys.exc_info()[0]}')
+            
+            hoy = datetime.now().date()  
+            fecha_minima = hoy + timedelta(days=2)
+            while True:
+                fecha_usuario_str=input("\nINGRESE LA FECHA DE RESERVA (MM-DD-AAAA): ").strip()
+                try:
+                    fecha_usuario = datetime.strptime(fecha_usuario_str, "%m-%d-%Y").date()
+
+                    if fecha_usuario >= fecha_minima:
+                        if fecha_usuario.weekday() == 6:
+                            lunes_siguiente = fecha_usuario + timedelta(days=1)
+                            print(f'Error. No se permiten reservaciones en domingo ({fecha_usuario.strftime("%m-%d-%Y")}).')
+                            print(f'Sugerencia: Puede reservar el lunes {lunes_siguiente.strftime("%m-%d-%Y")}.')
+                            continue
+                        else:
+                            print("La fecha es válida para reserva")
+                            break
+                    else:
+                        print(f'Error. La fecha debe de ser por lo menos 2 días posteriores a hoy {hoy}')
+                        continue
+
+                except ValueError:
+                    print("Formato de fecha invalido")
+                    continue
+            
+
+            while True:
+                print('TURNOS: "Matutino"(M) | "Vespertino"(V) | "Nocturno"(N)')
+                seleccionar_turno = input("Ingrese turno el turno que desea (M/V/N): ").upper().strip()
+                if seleccionar_turno:
+                    if seleccionar_turno == 'M':
+                        turno = 'Matutino'
+                    elif seleccionar_turno == 'V':
+                        turno = 'Vespertino'
+                    elif seleccionar_turno == 'N':
+                        turno = 'Nocturno'
+                    else:
+                        print('Turno invalido')
+                        continue
+                    print('Turno registrado')
+                    break
+                else:
+                    print('Error. Seleccione un turno valido')
+                    continue
+
+
+            try:
+                with sqlite3.connect('espacios_coworking.db',detect_types = sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute('SELECT id_sala, nombre_sala, cupo_sala FROM salas')
+                    salas_totales = cursor.fetchall()
+
+                    if not salas_totales:
+                        print('No hay salas registradas aún.')
+                        continue
+
+
+                    datos_buscar = {'fecha': fecha_usuario, 'turno': turno}
+                    cursor.execute('SELECT id_sala FROM reservaciones \
+                                    WHERE fecha_reservacion = :fecha \
+                                    AND turno_reservacion = :turno', datos_buscar)
+                    salas_ocupadas = [fila[0] for fila in cursor.fetchall()]
+
+
+                    salas_disponibles = [(id_sala, nombre_sala, cupo_sala)
+                                        for id_sala, nombre_sala, cupo_sala in salas_totales
+                                        if id_sala not in salas_ocupadas]
+
+                    if salas_disponibles:
+                        print('\n********** SALAS DISPONIBLES **********')
+                        print(f'{"ID":<5}{"NOMBRE":<20}{"CUPO":<10}')
+                        print('=' * 35)
+                        for id_sala, nombre_sala, cupo_sala in salas_disponibles:
+                            print(f'{id_sala:<5}{nombre_sala:<20}{cupo_sala:<10}')
+                    else:
+                        print('No hay salas disponibles para esa fecha y turno.')
+                        continue
+            except Error as e:
+                print(e)
+            except:
+                print(f'Se produjo un error: {sys.exc_info()[0]}')
+
+
+            salas_ids = [id_sala for id_sala, nombre_sala, cupo_sala in salas_disponibles]
+
+            while True:
+                try:
+                    sala_seleccionada = int(input("\nIngrese el ID de la sala que desea reservar: "))
+                except ValueError:
+                    print("Error. Debe ingresar un número de sala válido.")
+                    continue
+
+                if sala_seleccionada not in salas_ids:
+                    print("La sala seleccionada no está disponible.")
+                    continue
+                else:
+                    print("Sala seleccionada correctamente.")
+                    break
+
+
+            while True:
+                nombre_reserva = input('\nIngrese el nombre del evento o reservación: ').strip().title()
+                if not nombre_reserva:
+                    print('Error. El nombre no puede estar vacío.')
+                    continue
+                else:
+                    break
+
+
+            reservacion = (nombre_reserva, turno, fecha_usuario, id_cliente_buscar, sala_seleccionada)
+
+            try:
+                with sqlite3.connect('espacios_coworking.db', detect_types = sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute('INSERT INTO reservaciones (nombre_reservacion, turno_reservacion, \
+                                fecha_reservacion, id_cliente, id_sala) VALUES (?,?,?,?,?)', reservacion)
+                    folio = cursor.lastrowid
+                    print(f'\nReservación registrada exitosamente con el folio #{folio}.')
+                    print(f'Fecha: {fecha_usuario.strftime("%m-%d-%Y")}')
+                    break
+            except Error as e:
+                print(e)
+            except:
+                print(f'Se produjo un error: {sys.exc_info()[0]}')
+    
+    else:
+        print('No hay clientes registrados')
+        continue
 
           
-
-        while True:
-          nombre_reserva = input('\nIngrese el nombre de la reservación de la sala: ').strip()
-          if not nombre_reserva:
-            print('Error. El nombre no puede estar vacío')
-            continue
-          else:
-            break
-
-        
-        folio_contador += 1
-        folio = f"F{folio_contador}"
-
-        reservas[folio] = {
-          'cliente_id': id_cliente_buscar,
-          'sala_id': sala_seleccionada,
-          'fecha': fecha_usuario,
-          'turno': turno_sala,
-          'evento': nombre_reserva
-        }
-
-        print(f"\nReservación registrada con éxito. Folio: {folio}")
-        print(f"Cliente: {clientes[id_cliente_buscar][1]} {clientes[id_cliente_buscar][0]}")
-        print(f"Sala: {salas[sala_seleccionada][0]} (Cupo: {salas[sala_seleccionada][1]})")
-        print(f"Fecha: {fecha_usuario} | Turno: {turno_sala} | Evento: {nombre_reserva}")
-        break
-   
-
-    else:
-      print('Error. Aún no hay clientes registrados')
-      continue
-
-
   if opcion == '2':
-    
-    if reservas:
+    while True:
+        try:
+            fecha_inicio_str = input("\nIngrese fecha de inicio (MM-DD-AAAA) ('X' para salir): ").strip().upper()
+            if fecha_inicio_str == 'X':
+                print('Saliendo...')
+                break
+            fecha_fin_str = input("Ingrese fecha final (MM-DD-AAAA): ").strip()
+            
+            fecha_inicio = datetime.strptime(fecha_inicio_str, "%m-%d-%Y").date()
+            fecha_fin = datetime.strptime(fecha_fin_str, "%m-%d-%Y").date()
+            if fecha_fin < fecha_inicio:
+                print("Error. La fecha final no puede ser anterior a la fecha de inicio.")
+                continue
+        except ValueError:
+            print("Formato de fecha inválido")
+            continue
 
-    
-      try:
-        fecha_inicio_str = input("\nIngrese fecha de inicio (DD-MM-AAAA) ('X' para salir): ").strip().upper()
-        if fecha_inicio_str == 'X':
-          print('Saliendo...')
-          continue
-        fecha_fin_str = input("Ingrese fecha final (DD-MM-AAAA): ").strip()
+        fechas = (fecha_inicio.isoformat(), fecha_fin.isoformat())
+        reservacion_fechas = []
         
-        fecha_inicio = datetime.strptime(fecha_inicio_str, "%d-%m-%Y").date()
-        fecha_fin = datetime.strptime(fecha_fin_str, "%d-%m-%Y").date()
+        try:
+            with sqlite3.connect('espacios_coworking.db') as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT folio_reservacion, nombre_reservacion, \
+                                turno_reservacion, fecha_reservacion \
+                                FROM reservaciones \
+                                WHERE fecha_reservacion BETWEEN ? AND ?', fechas)
+                reservacion_fechas = cursor.fetchall()
 
-        if fecha_fin < fecha_inicio:
-          print("Error. La fecha final no puede ser anterior a la fecha de inicio.")
-          continue
-      except ValueError:
-        print("Formato de fecha inválido")
-        continue
+            if reservacion_fechas:
+                print('\n***** RESERVACIONES EN EL RANGO DE FECHAS *****')
+                print(f'{"FOLIO":<10}{"NOMBRE":<20}{"TURNO":<15}{"FECHA"}')
+                print('='*55)
+                
+                for folio, nombre, turno, fecha in reservacion_fechas:
+                    
+                    fecha_formateada = "FECHA N/A"
+                    if isinstance(fecha, str):
+                        try:
+                            fecha_formateada = datetime.fromisoformat(fecha).strftime('%m-%d-%Y')
+                        except ValueError:
+                            fecha_formateada = fecha
+                    elif hasattr(fecha, 'strftime'):
+                        fecha_formateada = fecha.strftime('%m-%d-%Y')
+                    
+                    print(f'{folio:<10}{nombre:<20}{turno:<15}{fecha_formateada}')
+            
+            else: 
+                print('No hay reservaciones en este rango de fechas')
+                continue
+        
+        except Error as e:
+            print(f"Error de base de datos: {e}")
+            continue
+        except Exception as e:
+            print(f'Se produjo un error {e}')
+            continue
 
-    
-      reservas_en_rango = {}
-      for folio, datos in reservas.items():
-        if fecha_inicio <= datos['fecha'] <= fecha_fin:
-          reservas_en_rango[folio] = datos
+        folio_seleccionado = input("\nIngrese el folio de la reserva que desea modificar: ").strip().upper()
+        folios_validos = [fila[0] for fila in reservacion_fechas]
+        try:
+            folio_seleccionado = int(folio_seleccionado)
+        except ValueError:
+            print('Ingrese un número de folio valido')
+            continue
+        if folio_seleccionado not in folios_validos:
+            print('Folio no valido')
+            continue
 
-      if not reservas_en_rango:
-        print("No hay reservaciones en ese rango de fechas.")
-        continue
+        nuevo_evento = input("Ingrese el nuevo nombre del evento: ").strip()
+        if not nuevo_evento:
+            print("El nombre del evento no puede estar vacío.")
+            continue      
+        
+        editar_datos = (nuevo_evento, folio_seleccionado)
+        try:
+            with sqlite3.connect('espacios_coworking.db') as conn:
+                cursor = conn.cursor()
+                cursor.execute('UPDATE reservaciones \
+                                SET nombre_reservacion = ? \
+                                WHERE folio_reservacion = ?', editar_datos)
+                conn.commit()
+                print('Nombre de reservacion actualizado')
+                break
 
-    
-      print(f'\n{'FOLIO'}\t{'FECHA'}\t\t{'SALA'}\t\t{'CLIENTE'}\t\t{'EVENTO'}\t\t{'TURNO'}')
-      for folio, datos in reservas_en_rango.items():
-        cliente_id = datos['cliente_id']
-        sala_id = datos['sala_id']
-        nombre_cliente = f"{clientes[cliente_id][1]} {clientes[cliente_id][0]}"
-        nombre_sala = salas[sala_id][0]
-        print(f'{folio}\t{datos['fecha']}\t{nombre_sala}\t\t{nombre_cliente}\t{datos['evento']}\t\t{datos['turno']}')
-
-      
-      folio_sel = input("\nIngrese el folio de la reserva que desea modificar: ").strip().upper()
-      if folio_sel not in reservas_en_rango.keys():
-        print("Error. Folio no válido o fuera del rango.")
-        continue
-
-      
-      nuevo_evento = input("Ingrese el nuevo nombre del evento: ").strip()
-      if not nuevo_evento:
-        print("Error. El nombre del evento no puede estar vacío.")
-        continue
-
-      reservas[folio_sel]['evento'] = nuevo_evento
-      print(f"Reserva {folio_sel} actualizada con éxito. Nuevo evento: {nuevo_evento}")
-
-    else:
-      print('No hay reservaciones registradas')
-      continue
+        except Error as e:
+            print(e)
+        except:
+            print(f'Se produjo un error: {sys.exc_info()[0]}')
+        
 
 
   if opcion == '3':
-    if not reservas:
-        print("No hay reservaciones registradas.")
-        continue
-
-    
-    fechas_con_reservas = sorted({datos['fecha'] for datos in reservas.values()})
-
-    
-    print("\nFechas con reservaciones registradas:")
-    for fecha in fechas_con_reservas:
-        print(f"- {fecha.strftime('%d-%m-%Y')}")
-
-    
-    fecha_consulta_str = input("\nIngrese la fecha a consultar (DD-MM-AAAA) ('X' para salir): ").strip()
-    
-    if fecha_consulta_str.upper() == 'X':
-        print('Saliendo...')
-        continue
-
-    try:
-        fecha_consulta = datetime.strptime(fecha_consulta_str, "%d-%m-%Y").date()
-    except ValueError:
-        print("Error. Formato de fecha inválido")
-        continue
-
-    reservas_para_fecha = {
-        folio: datos for folio, datos in reservas.items()
-        if datos['fecha'] == fecha_consulta
-    }
-
-    if not reservas_para_fecha:
-        print(f"No hay reservaciones hechas para la fecha {fecha_consulta}.")
-        continue
-
-    print("\n**************************")
-    print(f"*  REPORTE DE RESERVAS PARA EL DÍA {fecha_consulta.strftime('%d-%m-%Y')}  *")
-    print("**************************")
-    print(f"{'FOLIO':<8}{'SALA':<15}{'CLIENTE':<25}{'EVENTO':<25}{'TURNO':<10}")
-    for folio, datos in reservas_para_fecha.items():
-        cliente_id = datos['cliente_id']
-        sala_id = datos['sala_id']
-        nombre_cliente = f"{clientes[cliente_id][1]} {clientes[cliente_id][0]}"
-        nombre_sala = salas[sala_id][0]
-        print(f"{folio:<8}{nombre_sala:<15}{nombre_cliente:<25}{datos['evento']:<25}{datos['turno']:<10}")
-    print("********* FIN DEL REPORTE ************")
-    
-    opcion_exportar = input("\n¿Desea exportar este reporte? (S/N): ").strip().upper()
-    if opcion_exportar == 'S':
-      print("\nSeleccione formato de exportación:")
-      print("1. CSV")
-      print("2. JSON")
-      print("3. Excel (.xlsx)")
-      formato = input("Ingrese una opción (1-3): ").strip()
-      
-      reporte_export = []
-      for folio, datos in reservas_para_fecha.items():
-        cliente_id = datos['cliente_id']
-        sala_id = datos['sala_id']
-        nombre_cliente = f"{clientes[cliente_id][1]} {clientes[cliente_id][0]}"
-        nombre_sala = salas[sala_id][0]
-        reporte_export.append({
-            'Folio': folio,
-            'Sala': nombre_sala,
-            'Cliente': nombre_cliente,
-            'Evento': datos['evento'],
-            'Turno': datos['turno']
-        })
+    while True:
+        fecha_consulta_str = input("\nIngrese la fecha a consultar (MM-DD-AAAA) ('X' para salir): ").strip()
         
-        if formato == '1':
-          import csv
-          with open("reporte_reservas.csv", mode="w", newline="", encoding="latin1") as archivo:
-            writer = csv.DictWriter(archivo, fieldnames=reporte_export[0].keys())
-            writer.writeheader()
-            writer.writerows(reporte_export)
-          print("Reporte exportado a reporte_reservas.csv")
-          
-        elif formato == '2':
-          import json
-          with open("reporte_reservas.json", mode="w", encoding="latin1") as archivo:
-           json.dump(reporte_export, archivo, indent=4, ensure_ascii=False)
-          print("Reporte exportado a reporte_reservas.json")
-        
-        elif formato == '3':
-            from openpyxl import Workbook
-            from openpyxl.styles import Font, Border, Side, Alignment
+        if fecha_consulta_str.upper() == 'X':
+            print('Saliendo...')
+            break
 
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Reporte Reservas"
+        if fecha_consulta_str:
+            try:
+                fecha_consulta = datetime.strptime(fecha_consulta_str, "%m-%d-%Y").date()
+            except ValueError:
+                print("Formato de fecha invalido")
+                continue
 
-    # Título
-            ws.merge_cells('A1:E1')
-            ws['A1'] = f"REPORTE DE RESERVAS - {fecha_consulta.strftime('%d-%m-%Y')}"
-            ws['A1'].font = Font(bold=True, size=14)
-            ws['A1'].alignment = Alignment(horizontal='center')
-
-    # Encabezados
-            columnas = list(reporte_export[0].keys())
-            for col, nombre_col in enumerate(columnas, start=1):
-                celda = ws.cell(row=2, column=col, value=nombre_col)
-                celda.font = Font(bold=True)
-                celda.border = Border(bottom=Side(style='thick'))
-                celda.alignment = Alignment(horizontal='center')
-
-    # Datos
-            for fila, item in enumerate(reporte_export, start=3):
-                for col, valor in enumerate(item.values(), start=1):
-                    celda = ws.cell(row=fila, column=col, value=valor)
-                    celda.alignment = Alignment(horizontal='center')
-
-    # Ajustar ancho de columnas automáticamente
-            for col in ws.iter_cols(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-                max_length = 0
-                column = col[0].column_letter
-                for cell in col:
-                    if cell.value:
-                        max_length = max(max_length, len(str(cell.value)))
-                ws.column_dimensions[column].width = max_length + 2
-
-    # Guardar archivo 
-            nombre_archivo = "reporte_reservas.xlsx"
-            wb.save(nombre_archivo)
-            print(f"Reporte exportado como '{nombre_archivo}'")
         else:
-            print("Opcion no valida. No se exporto el reporte")
+            hoy = datetime.now().date()
+            fecha_consulta = hoy
+        datos_reservacion = []
+        try:
+            with sqlite3.connect('espacios_coworking.db') as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT c.nombre, c.apellido, s.id_sala, r.nombre_reservacion, r.turno_reservacion \
+                               FROM reservaciones AS r\
+                               INNER JOIN clientes AS c ON r.id_cliente = c.id_cliente\
+                               INNER JOIN salas AS s ON r.id_sala = s.id_sala\
+                               WHERE r.fecha_reservacion = ?', (fecha_consulta.isoformat(),))
+                datos_reservacion = cursor.fetchall()
+
+                if datos_reservacion:
+                    print('*'*75)
+                    print(f'** {"REPORTE DE RESERVACIONES PARA EL DÍA":^59}{fecha_consulta} **')
+                    print('*'*75)
+                    print(f'{'SALA':<10} {'CLIENTE':<30} {'EVENTO':<20} {'TURNO'}')
+                    print('='*75)
+                    for nombre, apellido, id_sala, evento, turno in datos_reservacion:
+                        cliente = f'{apellido} {nombre}'
+                        print(f'{id_sala:<10} {cliente:<30} {evento:<20} {turno}')
+                    print(f'** {"FIN DEL REPORTE":^69} **')
+                else:
+                    print('No hay reservaciones para esta fecha')
+                    continue
+           
+        except Error as e:
+            print(e)
+        except:
+            print(f'Se produjo un error: {sys.exc_info()[0]}')
+
+        if datos_reservacion:
+            while True:
+                opcion_exportar = input('Desdea exportar el reporte tabular? (S/N): ').strip().upper()
+                if opcion_exportar == 'S':
+                    print('a) CSV')
+                    print('b) JSON')
+                    print('c) EXCEL')
+                    formato_exportar = input('Seleccione el formato de exportacion: ').strip().lower()
+                    if formato_exportar == 'a':
+                        import csv
+                        try:
+                            with sqlite3.connect('espacios_coworking.db') as conn:
+                                cursor = conn.cursor()
+                                cursor.execute('SELECT s.id_sala, c.apellido || " " || c.nombre AS cliente, r.nombre_reservacion, r.turno_reservacion \
+                                                FROM reservaciones AS r\
+                                                INNER JOIN clientes AS c ON r.id_cliente = c.id_cliente\
+                                                INNER JOIN salas AS s ON r.id_sala = s.id_sala\
+                                                WHERE r.fecha_reservacion = ?', (fecha_consulta.isoformat(),))
+                                datos = cursor.fetchall()
+                                columnas = [desc[0] for desc in cursor.description]
+
+                                if datos:
+                                    with open('reservaciones.csv', 'w', newline='', encoding='utf-8') as archivo_csv:
+                                        escritor = csv.writer(archivo_csv)
+                                        escritor.writerow(columnas)
+                                        escritor.writerows(datos)
+                                    print('Archivo "reservaciones.csv" exportado correctamente.')
+                                else:
+                                    print('No hay datos para exportar.')
+                        except Error as e:
+                            print(e)
+                        except Exception as e:
+                            print(f'Se produjo un error al exportar a CSV: {e}')
+
+                    elif formato_exportar == 'b':
+                        import json
+                        try:
+                            with sqlite3.connect('espacios_coworking.db') as conn:
+                                cursor = conn.cursor()
+                                cursor.execute('SELECT s.id_sala, c.apellido || " " || c.nombre AS cliente, r.nombre_reservacion, r.turno_reservacion \
+                                                FROM reservaciones AS r\
+                                                INNER JOIN clientes AS c ON r.id_cliente = c.id_cliente\
+                                                INNER JOIN salas AS s ON r.id_sala = s.id_sala\
+                                                WHERE r.fecha_reservacion = ?', (fecha_consulta.isoformat(),))
+                                datos = cursor.fetchall()
+                                columnas = [desc[0] for desc in cursor.description]
+
+                                if datos:
+                                    lista_dicts = [dict(zip(columnas, fila)) for fila in datos]
+                                    with open('reservaciones.json', 'w', encoding='utf-8') as archivo_json:
+                                        json.dump(lista_dicts, archivo_json, ensure_ascii=False, indent=4)
+                                    print('Archivo "reservaciones.json" exportado correctamente.')
+                                else:
+                                    print('No hay datos para exportar.')
+                        except Error as e:
+                                print(e)
+                        except Exception as e:
+                                print(f'Se produjo un error al exportar a JSON: {e}')
+
+                    elif formato_exportar == 'c':
+                        from openpyxl import Workbook
+                        from openpyxl.styles import Font, Alignment, Border, Side
+
+                        try:
+                            with sqlite3.connect('espacios_coworking.db') as conn:
+                                cursor = conn.cursor()
+                                cursor.execute("SELECT r.folio_reservacion, c.nombre || ' ' || c.apellido AS cliente,\
+                                        s.nombre_sala, r.nombre_reservacion, r.turno_reservacion, r.fecha_reservacion\
+                                    FROM reservaciones AS r\
+                                    INNER JOIN clientes AS c ON r.id_cliente = c.id_cliente\
+                                    INNER JOIN salas AS s ON r.id_sala = s.id_sala\
+                                    ORDER BY r.fecha_reservacion")
+                                datos = cursor.fetchall()
+                                columnas = [desc[0] for desc in cursor.description]
+
+                                if datos:
+                                    wb = Workbook()
+                                    ws = wb.active
+                                    ws.title = "Reservaciones"
+
+
+                                    ws.merge_cells('A1:F1')
+                                    ws['A1'] = "REPORTE DE RESERVACIONES"
+                                    ws['A1'].font = Font(bold=True, size=14)
+                                    ws['A1'].alignment = Alignment(horizontal='center')
+
+
+                                    encabezado_font = Font(bold=True)
+                                    borde_grueso = Border(bottom=Side(style='thick'))
+                                    alineacion_centrada = Alignment(horizontal='center')
+
+                                    for col_num, encabezado in enumerate(columnas, 1):
+                                        celda = ws.cell(row=3, column=col_num, value=encabezado.upper())
+                                        celda.font = encabezado_font
+                                        celda.border = borde_grueso
+                                        celda.alignment = alineacion_centrada
+
+
+                                    for fila_num, fila_datos in enumerate(datos, 4):
+                                        for col_num, valor in enumerate(fila_datos, 1):
+                                            celda = ws.cell(row=fila_num, column=col_num, value=valor)
+                                            celda.alignment = alineacion_centrada
+
+
+                                    for col in ws.columns:
+                                        max_length = 0
+                                        column = col[2].column_letter
+                                        for cell in col:
+                                            try:
+                                                if len(str(cell.value)) > max_length:
+                                                    max_length = len(str(cell.value))
+                                            except:
+                                                pass
+                                        ws.column_dimensions[column].width = max_length + 2
+
+
+                                    wb.save("reservaciones.xlsx")
+                                    print("Reporte 'reservaciones.xlsx' exportado.")
+                                else:
+                                    print("No hay reservaciones registradas para exportar.")
+
+                        except Error as e:
+                            print(e)
+                        except Exception as ex:
+                            print(f"Error inesperado: {ex}")
+
+
+                    else:
+                        print('Formato no valido')
+                elif opcion_exportar == 'N':
+                    print('Regresando...')
+                    break
+                else:
+                    print('Ingrese una opcion valida')
+                    continue
+        else:
+            print(f'No hay reservaciones hechas para el dia {fecha_consulta}')
+
+  
 
   if opcion == '4':
     nombre_cliente = input('\nIngrese su nombre ("X" para salir): ').strip().title()
     if nombre_cliente == 'X':
-      print('Saliendo...')
-      continue
+        print('Saliendo...')
+        continue
     apellido_cliente = input('Ingrese su apellido: ').strip().title()
-    
-    if nombre_cliente and apellido_cliente:
-      id_cliente+=1
-      clientes[id_cliente] = nombre_cliente, apellido_cliente
-      print('Cliente registrado')
-    else:
-      print('Error. El nombre y apellido no pueden estar vacios') 
 
+    if nombre_cliente and apellido_cliente:
+
+        clientes = (nombre_cliente, apellido_cliente)
+           
+        try:
+            with sqlite3.connect('espacios_coworking.db') as conn:
+                cursor = conn.cursor()
+                cursor.execute('INSERT INTO clientes (nombre, apellido) values(?,?)', clientes)
+                print('Cliente registrado')
+        except Error as e:
+            print(e)
+        except:
+            print(f'Se produjo un error: {sys.exc_info()[0]}')
+    else:
+        print('Error. El nombre y apellido no pueden estar vacios') 
 
   if opcion == '5':
     nombre_sala = input('\nIngrese el nombre de su sala ("X" para salir): ').strip().title()
     if nombre_sala == 'X':
       print('Saliendo...')
       continue
-    cupo_sala_str = input('Ingrese el cupo de su sala: ').strip() 
-    if nombre_sala and cupo_sala_str:
-      try:
-        cupo_sala  = int(cupo_sala_str)
-        if cupo_sala <= 0:
-          raise ValueError
-      except ValueError:
-        print('Error. Cupo de sala invalido')
-      else:   
-        id_sala+=1  
-        salas[id_sala] = nombre_sala, cupo_sala
-        print('Sala creada')
+    cupo_sala = input('Ingrese el cupo de su sala: ').strip() 
+
+    if nombre_sala and cupo_sala:
+        try:
+            cupo_sala  = int(cupo_sala)
+            if cupo_sala <= 0:
+                raise ValueError
+        except ValueError:
+            print('Error. Cupo de sala invalido')
+        else:
+            salas = (nombre_sala, cupo_sala)
+            try:
+                with sqlite3.connect('espacios_coworking.db') as conn:
+                    cursor = conn.cursor()
+                    cursor.execute('INSERT INTO salas (nombre_sala, cupo_sala) values(?,?)', salas)
+                    print('Sala registrada')
+            except Error as e:
+                print(e)
+            except:
+                print(f'Se produjo un error: {sys.exc_info()[0]}')
     else:
-      print('Error. El nombre y cupo no pueden estar vacios')
+       print('Error. El nombre y cupo no pueden estar vacios')
 
 
   if opcion == '6':
-      confirmar = input("¿Está seguro que desea salir? (S/N): ").strip().upper()
-      if confirmar == 'S':
-          import json
-        
-        # Serializar clientes
-          with open("clientes.json", "w", encoding="utf-8") as archivo:
-              json.dump(clientes, archivo, indent=4, ensure_ascii=False)
-        
-        # Serializar salas
-          with open("salas.json", "w", encoding="utf-8") as archivo:
-              json.dump(salas, archivo, indent=4, ensure_ascii=False)
-        
-        # Serializar reservas (fechas como string para JSON)
-          reservas_serializables = {
-              folio: {
-                  **datos,
-                  'fecha': datos['fecha'].strftime("%Y-%m-%d")
-              }
-              for folio, datos in reservas.items()
-          }
-          with open("reservas.json", "w", encoding="utf-8") as archivo:
-              json.dump(reservas_serializables, archivo, indent=4, ensure_ascii=False)
-        
-          print("Datos guardados correctamente. Gracias por su visita.")
-          break
-      elif confirmar == 'N':
-          print("Salida cancelada. Regresando al menú principal...")
-          continue
-      else:
-          print("respuesta invalida. Por favor ingrese 'S' para salir o 'N' para cancelar.")
-          continue
+    print('Gracias por su visita!')
+    break
